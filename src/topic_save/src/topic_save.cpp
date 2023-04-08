@@ -12,6 +12,7 @@
 #include <cv_bridge/cv_bridge.h> 
 #include <sensor_msgs/Image.h>
 #include <iostream>
+#include <geometry_msgs/Twist.h>
 
 using namespace std;
 
@@ -19,8 +20,9 @@ class PointCloudIMUSaver {
 public:
     PointCloudIMUSaver(ros::NodeHandle& nh) : orientation_(Eigen::Quaterniond::Identity()) {        
         point_cloud_subscriber_ = nh.subscribe("/os1_cloud_node/points", 5, &PointCloudIMUSaver::pointCloudCallback, this);
-        imu_subscriber_ = nh.subscribe("/imu/data", 5, &PointCloudIMUSaver::imuCallback, this);
+        imu_subscriber_ = nh.subscribe("/os1_cloud_node/imu", 5, &PointCloudIMUSaver::imuCallback, this);
         img_subscriber_ = nh.subscribe("/pylon_camera_node/image_raw", 5, &PointCloudIMUSaver::imageCallback, this);
+        linear_vel_publisher_ = nh.advertise<geometry_msgs::Twist>("/linear_velocity", 1);
     }
 
 private:
@@ -28,12 +30,14 @@ private:
     ros::Subscriber imu_subscriber_;
     ros::Subscriber img_subscriber_;
     std::deque<sensor_msgs::Imu> imu_buffer_;
+    ros::Publisher linear_vel_publisher_;
+
     ros::Time last_imu_time_;
     double last_save_time_ = 0.0;  
     int save_index_ = 0;  
     double time_offset = 0.0;
     Eigen::Quaterniond orientation_;
-    Eigen::Vector3d velocity_;
+    Eigen::Vector3d velocity_ = Eigen::Vector3d::Zero();
 
     sensor_msgs::PointCloud2ConstPtr last_point_cloud_msg_; // Added variable to store last point cloud message
     sensor_msgs::ImageConstPtr last_image_msg_; // Added variable to store last image message
@@ -111,15 +115,26 @@ private:
             Eigen::Quaterniond orientation(this->orientation_);
             Eigen::Vector3d angular_vel(corresponding_imu.angular_velocity.x, corresponding_imu.angular_velocity.y, corresponding_imu.angular_velocity.z);
             Eigen::Vector3d linear_vel = orientation.toRotationMatrix() * angular_vel;
-            double imu_time_diff = (-0.9) / (linear_vel[0]*100);
+            // double imu_time_diff = (-0.9) / (linear_vel[0]*100);
+            double imu_time_diff = -linear_vel[0]/angular_vel[0]+sqrt(linear_vel[0]*linear_vel[0]+1.8*angular_vel[0]);
+
             if (linear_vel[0]<0){
                 ROS_INFO_STREAM("time_difference : "<< imu_time_diff);
                 ROS_INFO_STREAM("linear velocity: "<< linear_vel[0]);
             }
 
-            // saveIMUMeasurementsToFile(corresponding_imu, point_cloud_time + imu_time_diff, linear_vel);
-            // } else {
-            // ROS_WARN("Could not find corresponding IMU measurement for the point cloud.");
+            geometry_msgs::Twist linear_vel_msg;
+            linear_vel_msg.linear.x = linear_vel[0];
+            linear_vel_msg.linear.y = linear_vel[1];
+            linear_vel_msg.linear.z = linear_vel[2];
+            linear_vel_publisher_.publish(linear_vel_msg);
+
+            if (imu_time_diff > 0 && imu_time_diff < 3){
+                saveIMUMeasurementsToFile(corresponding_imu, point_cloud_time + imu_time_diff, linear_vel);
+                } else {
+                ROS_WARN("Could not find corresponding IMU measurement for the point cloud.");
+            }
+
         }
     }
 
@@ -136,7 +151,5 @@ int main(int argc, char** argv) {
   ros::NodeHandle nh;
 
   PointCloudIMUSaver point_cloud_imu_saver(nh);
-
-
   ros::spin();
 };

@@ -14,6 +14,7 @@ find_package(catkin REQUIRED COMPONENTS
   sensor_msgs
   velodyne_pointcloud
   cv_bridge
+  geometry_msgs
 
 )
 find_package(Boost REQUIRED)
