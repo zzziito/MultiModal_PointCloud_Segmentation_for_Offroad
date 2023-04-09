@@ -19,7 +19,7 @@ using namespace std;
 class PointCloudIMUSaver {
 public:
     PointCloudIMUSaver(ros::NodeHandle& nh) : orientation_(Eigen::Quaterniond::Identity()) {        
-        point_cloud_subscriber_ = nh.subscribe("/os1_cloud_node/points", 5, &PointCloudIMUSaver::pointCloudCallback, this);
+        point_cloud_subscriber_ = nh.subscribe("/pylon_camera_node/image_raw/cropped_point", 5, &PointCloudIMUSaver::pointCloudCallback, this);
         imu_subscriber_ = nh.subscribe("/os1_cloud_node/imu", 5, &PointCloudIMUSaver::imuCallback, this);
         img_subscriber_ = nh.subscribe("/pylon_camera_node/image_raw", 5, &PointCloudIMUSaver::imageCallback, this);
         linear_vel_publisher_ = nh.advertise<geometry_msgs::Twist>("/linear_velocity", 1);
@@ -31,6 +31,7 @@ private:
     ros::Subscriber img_subscriber_;
     std::deque<sensor_msgs::Imu> imu_buffer_;
     ros::Publisher linear_vel_publisher_;
+
 
     ros::Time last_imu_time_;
     double last_save_time_ = 0.0;  
@@ -51,6 +52,12 @@ private:
 
             pcl::PointCloud<pcl::PointXYZ> cloud;
             pcl::fromROSMsg(*msg, cloud);
+            
+            if (cloud.empty()){
+                ROS_WARN("Received empty point cloud data.");
+                return;
+            }
+
             pcl::io::savePCDFileASCII("/media/rtlink/JetsonSSD-256/socap_dataset/pc/"+std::to_string(save_index_) + "_" + std::to_string(current_time) + ".pcd", cloud);
 
 
@@ -63,7 +70,22 @@ private:
                 return;
             }
 
-            cv::imwrite("/media/rtlink/JetsonSSD-256/socap_dataset/image/"+std::to_string(save_index_) + "_" + std::to_string(current_time) + ".png", cv_ptr->image);
+            //이미지 크롭
+            ROS_INFO_STREAM("image size : "<< cv_ptr->image.size);
+
+            cv::Mat cropped_img;
+            int width = 550;
+            int height = 550;
+            int x = 960-width/2; // center x-coordinate of the crop
+            int y = 1200-height; // center y-coordinate of the crop
+            cv::Rect roi(x, y, width, height);
+            if (roi.x >= 0 && roi.y >= 0 && roi.x + roi.width <= cv_ptr->image.cols && roi.y + roi.height <= cv_ptr->image.rows) {
+                cropped_img = cv_ptr->image(roi);
+                cv::imwrite("/media/rtlink/JetsonSSD-256/socap_dataset/image/"+std::to_string(save_index_) + "_" + std::to_string(current_time) + ".png", cropped_img);
+            } else {
+                ROS_WARN("The cropping area is outside of the image boundaries.");
+            }
+            // cv::imwrite("/media/rtlink/JetsonSSD-256/socap_dataset/image/"+std::to_string(save_index_) + "_" + std::to_string(current_time) + ".png", cv_ptr->image);
 
             double time_offset = 0.0;
             if (!imu_buffer_.empty()) {
@@ -131,6 +153,7 @@ private:
 
             if (imu_time_diff > 0 && imu_time_diff < 3){
                 saveIMUMeasurementsToFile(corresponding_imu, point_cloud_time + imu_time_diff, linear_vel);
+                
                 } else {
                 ROS_WARN("Could not find corresponding IMU measurement for the point cloud.");
             }
