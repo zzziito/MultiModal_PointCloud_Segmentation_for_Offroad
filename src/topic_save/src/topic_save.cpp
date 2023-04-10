@@ -164,7 +164,7 @@ private:
     void saveIMUMeasurementsToFile(const sensor_msgs::Imu& imu, double point_cloud_time, const Eigen::Vector3d& linear_vel) {        
         std::string filename = "/media/rtlink/JetsonSSD-256/socap_dataset/imu/" + std::to_string(save_index_) + "_" + std::to_string(imu.header.stamp.toSec()) + ".csv";
         std::ofstream outfile(filename);
-        outfile << "header,timestamp,orientation_x,orientation_y,orientation_z,orientation_w,angular_velocity_x,angular_velocity_y,angular_velocity_z,linear_acceleration_x,linear_acceleration_y,linear_acceleration_z" << std::endl;
+        outfile << "header,orientation_x,orientation_y,orientation_z,orientation_w,angular_velocity_x,angular_velocity_y,angular_velocity_z,linear_acceleration_x,linear_acceleration_y,linear_acceleration_z" << std::endl;
         outfile << imu.header.stamp << "," << imu.orientation.x << "," << imu.orientation.y << "," << imu.orientation.z << "," << imu.orientation.w << "," << imu.angular_velocity.x << "," << imu.angular_velocity.y << "," << imu.angular_velocity.z << "," << imu.linear_acceleration.x << "," << imu.linear_acceleration.y << "," << imu.linear_acceleration.z << std::endl;
     }
 };
