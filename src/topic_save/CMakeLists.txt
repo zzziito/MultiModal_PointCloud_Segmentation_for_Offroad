@@ -218,3 +218,6 @@ target_link_libraries(topic_save ${catkin_LIBRARIES})
 
 # add_executable(data_saver src/data_saver.cpp)
 # target_link_libraries(data_saver ${catkin_LIBRARIES} ${Boost_LIBRARIES})
+
+add_executable(imu_velocity_node src/velocity_publisher.cpp)
+target_link_libraries(imu_velocity_node ${catkin_LIBRARIES})
