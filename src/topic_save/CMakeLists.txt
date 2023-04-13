@@ -15,6 +15,7 @@ find_package(catkin REQUIRED COMPONENTS
   velodyne_pointcloud
   cv_bridge
   geometry_msgs
+  tf2
 
 )
 find_package(Boost REQUIRED)
@@ -221,3 +222,6 @@ target_link_libraries(topic_save ${catkin_LIBRARIES})
 
 add_executable(imu_velocity_node src/velocity_publisher.cpp)
 target_link_libraries(imu_velocity_node ${catkin_LIBRARIES})
+
+add_executable(tf_publisher src/tf_vel.cpp)
+target_link_libraries(tf_publisher ${catkin_LIBRARIES})

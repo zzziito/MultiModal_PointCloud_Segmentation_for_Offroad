@@ -3,6 +3,9 @@
 #include <sensor_msgs/Imu.h>
 #include <vector>
 #include <numeric>
+#include <tf2_ros/transform_broadcaster.h>
+#include <tf2/LinearMath/Quaternion.h>
+#include <numeric>
 
 using namespace std;
 
@@ -10,12 +13,16 @@ vector<double> velocities_x;
 vector<double> velocities_y;
 vector<double> velocities_z;
 
+ros::Time current_time;
+
 void imu_callback(const sensor_msgs::Imu::ConstPtr& msg)
 {
   velocities_x.push_back(msg->linear_acceleration.x);
   velocities_y.push_back(msg->linear_acceleration.y);
   velocities_z.push_back(msg->linear_acceleration.z);
+  current_time = msg->header.stamp;
 }
+
 
 int main(int argc, char** argv)
 {
@@ -43,10 +50,14 @@ int main(int argc, char** argv)
 
       // Create the twist message
       geometry_msgs::TwistStamped velocity_msg;
-      velocity_msg.header.stamp = ros::Time::now(); // Set the current time as the timestamp
-      velocity_msg.twist.linear.x = average_velocity_x;
-      velocity_msg.twist.linear.y = average_velocity_y;
-      velocity_msg.twist.linear.z = average_velocity_z;
+    //   velocity_msg.header.stamp = ros::Time::now(); // Set the current time as the timestamp
+      velocity_msg.header.stamp = current_time; // Set the timestamp from the received message
+      velocity_msg.header.frame_id = "base_link"; // Set the frame ID
+      velocity_msg.twist.linear.x = -average_velocity_x;
+    //   velocity_msg.twist.linear.y = average_velocity_y;
+      velocity_msg.twist.linear.y = 0;
+    //   velocity_msg.twist.linear.z = average_velocity_z;
+      velocity_msg.twist.linear.z = 0;
 
       // Publish the message
       velocity_pub.publish(velocity_msg);

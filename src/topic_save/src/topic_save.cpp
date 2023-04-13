@@ -13,16 +13,22 @@
 #include <sensor_msgs/Image.h>
 #include <iostream>
 #include <geometry_msgs/Twist.h>
+#include <geometry_msgs/TwistStamped.h>
+#include <numeric>
 
 using namespace std;
 
 class PointCloudIMUSaver {
 public:
     PointCloudIMUSaver(ros::NodeHandle& nh) : orientation_(Eigen::Quaterniond::Identity()) {        
+        // point_cloud_subscriber_ = nh.subscribe("/os1_cloud_node/points", 5, &PointCloudIMUSaver::pointCloudCallback, this);
         point_cloud_subscriber_ = nh.subscribe("/pylon_camera_node/image_raw/cropped_point", 5, &PointCloudIMUSaver::pointCloudCallback, this);
+
         imu_subscriber_ = nh.subscribe("/os1_cloud_node/imu", 5, &PointCloudIMUSaver::imuCallback, this);
         img_subscriber_ = nh.subscribe("/pylon_camera_node/image_raw", 5, &PointCloudIMUSaver::imageCallback, this);
         linear_vel_publisher_ = nh.advertise<geometry_msgs::Twist>("/linear_velocity", 1);
+
+        velocity_pub = nh.advertise<geometry_msgs::TwistStamped>("/linear_velocity2", 1);
     }
 
 private:
@@ -31,6 +37,12 @@ private:
     ros::Subscriber img_subscriber_;
     std::deque<sensor_msgs::Imu> imu_buffer_;
     ros::Publisher linear_vel_publisher_;
+
+    //
+    vector<double> velocities_x;
+    ros::Time current_time;
+    ros::Publisher velocity_pub;
+    //
 
 
     ros::Time last_imu_time_;
@@ -71,7 +83,7 @@ private:
             }
 
             //이미지 크롭
-            ROS_INFO_STREAM("image size : "<< cv_ptr->image.size);
+            // ROS_INFO_STREAM("image size : "<< cv_ptr->image.size);
 
             cv::Mat cropped_img;
             int width = 550;
@@ -101,6 +113,7 @@ private:
 
     void imageCallback(const sensor_msgs::ImageConstPtr& msg) {
         last_image_msg_ = msg; // Store the current image message
+        current_time = msg->header.stamp;
     }
 
     void imuCallback(const sensor_msgs::ImuConstPtr& msg) {
@@ -141,16 +154,39 @@ private:
             double imu_time_diff = -linear_vel[0]/angular_vel[0]+sqrt(linear_vel[0]*linear_vel[0]+1.8*angular_vel[0]);
 
             if (linear_vel[0]<0){
-                ROS_INFO_STREAM("time_difference : "<< imu_time_diff);
                 ROS_INFO_STREAM("linear velocity: "<< linear_vel[0]);
+
+                geometry_msgs::Twist linear_vel_msg;
+                linear_vel_msg.linear.x = linear_vel[0];
+                linear_vel_msg.linear.y = linear_vel[1];
+                linear_vel_msg.linear.z = linear_vel[2];
+                linear_vel_publisher_.publish(linear_vel_msg);
+                
+                geometry_msgs::TwistStamped velocity_msg;
+                velocity_msg.header.stamp = current_time;
+                velocity_msg.header.frame_id = "base_link";
+                velocity_msg.twist.linear.x = -100*linear_vel[0];
+                velocity_pub.publish(velocity_msg);
+
+                if(imu_time_diff > 0){
+                    ROS_INFO_STREAM("time_difference : "<< imu_time_diff);
+                }
             }
 
-            geometry_msgs::Twist linear_vel_msg;
-            linear_vel_msg.linear.x = linear_vel[0];
-            linear_vel_msg.linear.y = linear_vel[1];
-            linear_vel_msg.linear.z = linear_vel[2];
-            linear_vel_publisher_.publish(linear_vel_msg);
+            // geometry_msgs::Twist linear_vel_msg;
+            // linear_vel_msg.linear.x = linear_vel[0];
+            // linear_vel_msg.linear.y = linear_vel[1];
+            // linear_vel_msg.linear.z = linear_vel[2];
+            // linear_vel_publisher_.publish(linear_vel_msg);
+            // //
 
+            // geometry_msgs::TwistStamped velocity_msg;
+            // velocity_msg.header.stamp = current_time;
+            // velocity_msg.header.frame_id = "base_link";
+            // velocity_msg.twist.linear.x = -100*linear_vel[0];
+            // velocity_pub.publish(velocity_msg);
+
+            //
             if (imu_time_diff > 0 && imu_time_diff < 3){
                 saveIMUMeasurementsToFile(corresponding_imu, point_cloud_time + imu_time_diff, linear_vel);
                 
