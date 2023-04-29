@@ -1,0 +1,14 @@
+material sin_wave/wave_floor
+{
+  technique
+  {
+    pass
+    {
+      texture_unit
+      {
+        texture sin_wave.png
+        filtering trilinear
+      }
+    }
+  }
+}
